@@ -7,6 +7,7 @@ import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.text.Editable;
+import android.text.InputType;
 import android.text.TextWatcher;
 import android.view.*;
 import android.widget.*;
@@ -33,40 +34,34 @@ public class MainActivity extends AppCompatActivity {
     private final ArrayList<JSONObject> payments = new ArrayList<>();
     private final ArrayList<String> billedMonths = new ArrayList<>();
 
+    private final NumberFormat money =
+            NumberFormat.getCurrencyInstance(new Locale("en", "IN"));
+
     private LinearLayout root;
     private LinearLayout content;
-    private FrameLayout contentHost;
     private LinearLayout bottom;
     private TextView title;
 
+    private final int GREEN = Color.rgb(0, 184, 124);
+    private final int DARK = Color.rgb(0, 155, 110);
+    private final int BLUE = Color.rgb(23, 105, 220);
+    private final int BG = Color.rgb(246, 248, 250);
+    private final int TEXT = Color.rgb(30, 42, 55);
+
     private Customer selected;
-
-    private final int GREEN = Color.rgb(0, 170, 115);
-    private final int DARK_GREEN = Color.rgb(0, 135, 95);
-    private final int BLUE = Color.rgb(30, 105, 220);
-    private final int PURPLE = Color.rgb(105, 80, 210);
-    private final int BG = Color.rgb(245, 247, 249);
-    private final int TEXT = Color.rgb(28, 40, 52);
-    private final int SUBTEXT = Color.rgb(95, 105, 115);
-
-    private final NumberFormat money =
-            NumberFormat.getCurrencyInstance(new Locale("en", "IN"));
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        getWindow().setStatusBarColor(Color.rgb(8, 37, 55));
+        getWindow().setStatusBarColor(Color.rgb(12, 31, 50));
         getWindow().setNavigationBarColor(Color.WHITE);
+
         getWindow().getDecorView().setSystemUiVisibility(
                 View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
         );
 
         load();
-
-        // Automatically generate the current month's bill once.
-        generateCurrentMonth();
-
         showLogin();
     }
 
@@ -74,7 +69,11 @@ public class MainActivity extends AppCompatActivity {
     // BASE SCREEN
     // =========================================================
 
-    private void base(String screenTitle, boolean nav, boolean scroll) {
+    private void base(String screenTitle, boolean nav) {
+        base(screenTitle, nav, true);
+    }
+
+    private void base(String screenTitle, boolean nav, boolean showBack) {
 
         root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
@@ -86,38 +85,33 @@ public class MainActivity extends AppCompatActivity {
         LinearLayout bar = new LinearLayout(this);
         bar.setOrientation(LinearLayout.HORIZONTAL);
         bar.setGravity(Gravity.CENTER_VERTICAL);
-        bar.setPadding(dp(10), 0, dp(6), 0);
-        bar.setBackgroundColor(GREEN);
+        bar.setPadding(dp(8), dp(5), dp(8), dp(5));
+        bar.setBackgroundColor(Color.rgb(0, 157, 113));
 
         TextView back = new TextView(this);
         back.setText("‹");
         back.setTextColor(Color.WHITE);
         back.setTextSize(38);
         back.setGravity(Gravity.CENTER);
-        back.setPadding(0, 0, 0, dp(4));
+        back.setVisibility(showBack ? View.VISIBLE : View.INVISIBLE);
 
-        if (screenTitle.equals("MyCable Pro")) {
-            back.setVisibility(View.INVISIBLE);
-        } else {
-            back.setVisibility(View.VISIBLE);
-            back.setOnClickListener(v -> showDashboard());
-        }
+        back.setOnClickListener(v -> showDashboard());
 
         bar.addView(
                 back,
-                new LinearLayout.LayoutParams(dp(48), dp(58))
+                new LinearLayout.LayoutParams(dp(46), dp(54))
         );
 
         title = new TextView(this);
         title.setText(screenTitle);
         title.setTextColor(Color.WHITE);
-        title.setTextSize(20);
+        title.setTextSize(21);
         title.setTypeface(null, 1);
         title.setGravity(Gravity.CENTER_VERTICAL);
 
         bar.addView(
                 title,
-                new LinearLayout.LayoutParams(0, dp(58), 1)
+                new LinearLayout.LayoutParams(0, dp(54), 1)
         );
 
         TextView more = new TextView(this);
@@ -130,22 +124,15 @@ public class MainActivity extends AppCompatActivity {
 
         bar.addView(
                 more,
-                new LinearLayout.LayoutParams(dp(48), dp(58))
+                new LinearLayout.LayoutParams(dp(42), dp(54))
         );
 
         root.addView(bar);
 
-        // CONTENT HOST
-        contentHost = new FrameLayout(this);
-
-        root.addView(
-                contentHost,
-                new LinearLayout.LayoutParams(
-                        -1,
-                        0,
-                        1
-                )
-        );
+        // CONTENT
+        ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(true);
+        scroll.setClipToPadding(false);
 
         content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
@@ -153,41 +140,25 @@ public class MainActivity extends AppCompatActivity {
                 dp(14),
                 dp(12),
                 dp(14),
-                dp(14)
+                dp(nav ? 12 : 20)
         );
 
-        if (scroll) {
+        scroll.addView(
+                content,
+                new ScrollView.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT
+                )
+        );
 
-            ScrollView sv = new ScrollView(this);
-            sv.setFillViewport(true);
-            sv.setClipToPadding(false);
-
-            sv.addView(
-                    content,
-                    new ScrollView.LayoutParams(
-                            -1,
-                            -2
-                    )
-            );
-
-            contentHost.addView(
-                    sv,
-                    new FrameLayout.LayoutParams(
-                            -1,
-                            -1
-                    )
-            );
-
-        } else {
-
-            contentHost.addView(
-                    content,
-                    new FrameLayout.LayoutParams(
-                            -1,
-                            -1
-                    )
-            );
-        }
+        root.addView(
+                scroll,
+                new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        0,
+                        1
+                )
+        );
 
         if (nav) {
             buildBottom();
@@ -204,7 +175,6 @@ public class MainActivity extends AppCompatActivity {
         bottom.setOrientation(LinearLayout.HORIZONTAL);
         bottom.setGravity(Gravity.CENTER);
         bottom.setBackgroundColor(Color.WHITE);
-        bottom.setElevation(dp(5));
 
         String[] names = {
                 "⌂\nHome",
@@ -219,9 +189,9 @@ public class MainActivity extends AppCompatActivity {
 
             t.setText(n);
             t.setTextSize(11);
-            t.setTextColor(SUBTEXT);
             t.setGravity(Gravity.CENTER);
-            t.setPadding(0, dp(7), 0, dp(5));
+            t.setTextColor(Color.DKGRAY);
+            t.setPadding(0, dp(6), 0, dp(5));
 
             t.setOnClickListener(v -> {
 
@@ -229,13 +199,10 @@ public class MainActivity extends AppCompatActivity {
 
                 if (s.contains("Home")) {
                     showDashboard();
-
                 } else if (s.contains("Customers")) {
                     showCustomers();
-
                 } else if (s.contains("Billing")) {
                     showPayments();
-
                 } else {
                     showReports();
                 }
@@ -265,30 +232,30 @@ public class MainActivity extends AppCompatActivity {
         page.setOrientation(LinearLayout.VERTICAL);
         page.setGravity(Gravity.CENTER);
         page.setPadding(
-                dp(22),
+                dp(24),
                 dp(20),
-                dp(22),
+                dp(24),
                 dp(20)
         );
 
         page.setBackground(
                 gradient(
-                        Color.rgb(0, 155, 145),
-                        Color.rgb(4, 75, 125)
+                        Color.rgb(0, 151, 145),
+                        Color.rgb(4, 74, 125)
                 )
         );
 
-        TextView logo = label(
+        TextView tv = label(
                 "📺\nMyCable Pro",
                 34,
                 Color.WHITE,
                 true
         );
 
-        logo.setGravity(Gravity.CENTER);
+        tv.setGravity(Gravity.CENTER);
 
         page.addView(
-                logo,
+                tv,
                 new LinearLayout.LayoutParams(
                         -1,
                         dp(150)
@@ -312,7 +279,7 @@ public class MainActivity extends AppCompatActivity {
                 )
         );
 
-        EditText user = field("User Name");
+        EditText user = field("Username");
         page.addView(
                 user,
                 new LinearLayout.LayoutParams(
@@ -322,47 +289,47 @@ public class MainActivity extends AppCompatActivity {
         );
 
         EditText pass = field("Password");
-        pass.setInputType(0x81);
-
-        page.addView(
-                pass,
-                lp(12, 0)
+        pass.setInputType(
+                InputType.TYPE_CLASS_TEXT |
+                        InputType.TYPE_TEXT_VARIATION_PASSWORD
         );
+
+        page.addView(pass, lp(12));
 
         Button login = button("LOGIN", GREEN);
 
-        page.addView(
-                login,
-                lp(14, 0)
-        );
+        page.addView(login, lp(14));
 
         TextView hint = label(
-                "Default Password : 123456",
-                11,
+                "Username: Admin\nPassword: 123456",
+                12,
                 Color.WHITE,
                 false
         );
 
         hint.setGravity(Gravity.CENTER);
 
-        page.addView(
-                hint,
-                lp(8, 0)
-        );
+        page.addView(hint, lp(10));
 
         login.setOnClickListener(v -> {
 
-            String password = pass.getText().toString();
+            String username =
+                    user.getText().toString().trim();
 
-            if (password.isEmpty() ||
-                    password.equals("123456")) {
+            String password =
+                    pass.getText().toString();
 
-                showDashboard();
-
-            } else {
-
-                toast("Use password 123456");
+            if (username.isEmpty()) {
+                toast("Enter username");
+                return;
             }
+
+            if (!password.equals("123456")) {
+                toast("Incorrect password");
+                return;
+            }
+
+            showDashboard();
         });
 
         setContentView(page);
@@ -374,7 +341,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void showDashboard() {
 
-        base("MyCable Pro", true, true);
+        base("MyCable Pro", true, false);
 
         TextView hello = label(
                 "Vanakkam,\nAdmin",
@@ -385,7 +352,7 @@ public class MainActivity extends AppCompatActivity {
 
         content.addView(
                 hello,
-                lp(0, 8)
+                lp(2)
         );
 
         double due = 0;
@@ -402,177 +369,168 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
-        LinearLayout stats = new LinearLayout(this);
-        stats.setOrientation(LinearLayout.VERTICAL);
-
+        // STATISTICS
         addStatRow(
-                stats,
                 new String[]{
                         "👥  Total Customers\n" + customers.size(),
                         "✓  Active\n" + active
                 },
                 new int[]{
-                        Color.rgb(220, 238, 255),
-                        Color.rgb(220, 248, 228)
+                        Color.rgb(215, 235, 255),
+                        Color.rgb(218, 250, 226)
                 }
         );
 
         addStatRow(
-                stats,
                 new String[]{
                         "⊗  Due\n" + money.format(due),
                         "₹  Advance\n" + money.format(advance)
                 },
                 new int[]{
-                        Color.rgb(255, 229, 229),
-                        Color.rgb(255, 240, 205)
+                        Color.rgb(255, 224, 224),
+                        Color.rgb(255, 238, 201)
                 }
         );
 
-        content.addView(
-                stats,
-                lp(0, 10)
-        );
-
+        // MAIN MENU GRID
         LinearLayout grid = new LinearLayout(this);
         grid.setOrientation(LinearLayout.VERTICAL);
 
-        String[][] items = {
-                {"👥\nCustomers", "▣\nBilling", "₹\nCollection"},
-                {"▤\nPackages", "📍\nZones", "▥\nReports"}
-        };
-
-        for (String[] row : items) {
-
-            LinearLayout r = new LinearLayout(this);
-
-            for (String x : row) {
-
-                TextView t = card(x, 15);
-
-                LinearLayout.LayoutParams p =
-                        new LinearLayout.LayoutParams(
-                                0,
-                                dp(84),
-                                1
-                        );
-
-                p.setMargins(dp(3), dp(3), dp(3), dp(3));
-
-                r.addView(t, p);
-
-                if (x.contains("Customers")) {
-                    t.setOnClickListener(v -> showCustomers());
-
-                } else if (x.contains("Billing")) {
-                    t.setOnClickListener(v -> showPayments());
-
-                } else if (x.contains("Collection")) {
-                    t.setOnClickListener(v -> showCollect(false));
-
-                } else if (x.contains("Packages")) {
-                    t.setOnClickListener(v -> showPackages());
-
-                } else if (x.contains("Zones")) {
-                    t.setOnClickListener(v -> showZones());
-
-                } else {
-                    t.setOnClickListener(v -> showReports());
-                }
-            }
-
-            grid.addView(r);
-        }
-
-        content.addView(
+        addDashboardRow(
                 grid,
-                lp(0, 10)
+                new String[]{
+                        "👥\nCustomers",
+                        "▣\nBilling",
+                        "₹\nCollection"
+                }
         );
 
-        LinearLayout exportRow = new LinearLayout(this);
-
-        Button imp = button(
-                "Import Excel",
-                BLUE
+        addDashboardRow(
+                grid,
+                new String[]{
+                        "▤\nPackages",
+                        "📍\nZones",
+                        "▥\nReports"
+                }
         );
 
-        Button exp = button(
-                "Export Excel",
-                GREEN
-        );
+        content.addView(grid, lp(8));
 
-        exportRow.addView(
+        // IMPORT / EXPORT
+        LinearLayout q = new LinearLayout(this);
+        q.setOrientation(LinearLayout.HORIZONTAL);
+
+        Button imp = button("Import Excel", BLUE);
+        Button exp = button("Export Excel", GREEN);
+
+        q.addView(
                 imp,
                 new LinearLayout.LayoutParams(
                         0,
-                        dp(52),
+                        dp(54),
                         1
                 )
         );
 
-        exportRow.addView(
-                exp,
-                lpw(8)
-        );
+        LinearLayout.LayoutParams expLp =
+                new LinearLayout.LayoutParams(
+                        0,
+                        dp(54),
+                        1
+                );
 
-        content.addView(
-                exportRow,
-                lp(0, 10)
-        );
+        expLp.setMargins(dp(8), 0, 0, 0);
+
+        q.addView(exp, expLp);
+
+        content.addView(q, lp(10));
 
         imp.setOnClickListener(v -> pickExcel());
         exp.setOnClickListener(v -> createExport());
-
-        Button monthly = button(
-                "GENERATE MONTHLY BILL",
-                PURPLE
-        );
-
-        content.addView(
-                monthly,
-                lp(0, 8)
-        );
-
-        monthly.setOnClickListener(v -> showMonthly());
     }
 
-    private void addStatRow(
-            LinearLayout parent,
-            String[] values,
-            int[] colors) {
+    private void addStatRow(String[] values, int[] colors) {
 
-        LinearLayout r = new LinearLayout(this);
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
 
         for (int i = 0; i < values.length; i++) {
 
             TextView t = card(
                     values[i],
-                    14
+                    15,
+                    TEXT
             );
 
             t.setBackground(
                     round(colors[i], 14)
             );
 
-            t.setTextColor(TEXT);
-            t.setGravity(Gravity.CENTER);
+            LinearLayout.LayoutParams p =
+                    new LinearLayout.LayoutParams(
+                            0,
+                            dp(82),
+                            1
+                    );
+
+            if (i > 0) {
+                p.setMargins(dp(6), 0, 0, 0);
+            }
+
+            row.addView(t, p);
+        }
+
+        content.addView(row, lp(7));
+    }
+
+    private void addDashboardRow(
+            LinearLayout parent,
+            String[] items
+    ) {
+
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+
+        for (String item : items) {
+
+            TextView t = card(
+                    item,
+                    15,
+                    TEXT
+            );
 
             LinearLayout.LayoutParams p =
                     new LinearLayout.LayoutParams(
                             0,
-                            dp(76),
+                            dp(88),
                             1
                     );
 
-            p.setMargins(dp(3), 0, dp(3), 0);
+            p.setMargins(
+                    dp(2),
+                    dp(3),
+                    dp(2),
+                    dp(3)
+            );
 
-            r.addView(t, p);
+            row.addView(t, p);
+
+            if (item.contains("Customers")) {
+                t.setOnClickListener(v -> showCustomers());
+            } else if (item.contains("Billing")) {
+                t.setOnClickListener(v -> showPayments());
+            } else if (item.contains("Collection")) {
+                t.setOnClickListener(v -> showCollect(false));
+            } else if (item.contains("Packages")) {
+                t.setOnClickListener(v -> showPackages());
+            } else if (item.contains("Zones")) {
+                t.setOnClickListener(v -> showZones());
+            } else if (item.contains("Reports")) {
+                t.setOnClickListener(v -> showReports());
+            }
         }
 
-        parent.addView(
-                r,
-                lp(0, 6)
-        );
+        parent.addView(row);
     }
 
     // =========================================================
@@ -581,9 +539,14 @@ public class MainActivity extends AppCompatActivity {
 
     private void showCustomers() {
 
-        base("Customers", true, false);
+        base("Customers", true, true);
 
-        LinearLayout searchRow = new LinearLayout(this);
+        LinearLayout searchRow =
+                new LinearLayout(this);
+
+        searchRow.setOrientation(
+                LinearLayout.HORIZONTAL
+        );
 
         EditText search =
                 field("Search name, mobile, box...");
@@ -600,73 +563,84 @@ public class MainActivity extends AppCompatActivity {
         Button filterButton =
                 smallButton("☷");
 
+        LinearLayout.LayoutParams fp =
+                new LinearLayout.LayoutParams(
+                        dp(54),
+                        dp(50)
+                );
+
+        fp.setMargins(dp(6), 0, 0, 0);
+
         searchRow.addView(
                 filterButton,
-                lpw(6)
+                fp
         );
 
         content.addView(
                 searchRow,
-                lp(0, 7)
+                lp(0)
         );
 
-        LinearLayout chips = new LinearLayout(this);
+        // FILTER CHIPS
+        LinearLayout chips =
+                new LinearLayout(this);
+
+        chips.setOrientation(
+                LinearLayout.HORIZONTAL
+        );
 
         String[] chipNames = {
                 "All",
                 "Due",
                 "Advance",
-                "Deactive"
+                "Inactive"
         };
 
         for (String x : chipNames) {
 
             TextView chip = chip(x);
 
-            chips.addView(
-                    chip,
-                    chipParams()
+            LinearLayout.LayoutParams cp =
+                    new LinearLayout.LayoutParams(
+                            0,
+                            dp(40),
+                            1
+                    );
+
+            cp.setMargins(
+                    dp(2),
+                    0,
+                    dp(2),
+                    0
             );
 
+            chips.addView(chip, cp);
+
             chip.setOnClickListener(
-                    v -> {
-
-                        String mode =
-                                ((TextView) v).getText().toString();
-
-                        refreshCustomerList(
-                                search.getText().toString(),
-                                mode
-                        );
-                    }
+                    v -> renderCustomers(
+                            search,
+                            ((TextView) v)
+                                    .getText()
+                                    .toString()
+                    )
             );
         }
 
-        content.addView(chips);
+        content.addView(chips, lp(8));
 
-        FrameLayout listHost = new FrameLayout(this);
-
-        content.addView(
-                listHost,
-                new LinearLayout.LayoutParams(
-                        -1,
-                        0,
-                        1
-                )
-        );
-
+        // CUSTOMER LIST
         ListView list = new ListView(this);
 
         list.setDivider(null);
-        list.setPadding(0, dp(5), 0, 0);
+        list.setDividerHeight(0);
         list.setBackgroundColor(BG);
-        list.setClipToPadding(false);
+        list.setPadding(0, dp(5), 0, dp(5));
 
-        listHost.addView(
+        content.addView(
                 list,
-                new FrameLayout.LayoutParams(
+                new LinearLayout.LayoutParams(
                         -1,
-                        -1
+                        dp(500)
                 )
         );
 
@@ -682,7 +656,8 @@ public class MainActivity extends AppCompatActivity {
                             CharSequence s,
                             int start,
                             int count,
-                            int after) {
+                            int after
+                    ) {
                     }
 
                     @Override
@@ -690,9 +665,10 @@ public class MainActivity extends AppCompatActivity {
                             CharSequence s,
                             int start,
                             int before,
-                            int count) {
-
-                        refreshCustomerList(
+                            int count
+                    ) {
+                        renderCustomers(
+                                list,
                                 s.toString(),
                                 "All"
                         );
@@ -700,88 +676,92 @@ public class MainActivity extends AppCompatActivity {
 
                     @Override
                     public void afterTextChanged(
-                            Editable s) {
+                            Editable s
+                    ) {
                     }
                 }
         );
 
         renderCustomers(
                 list,
-                getFilteredCustomers(
-                        "",
-                        "All"
-                )
+                "",
+                "All"
         );
     }
 
-    private void refreshCustomerList(
-            String query,
-            String mode) {
+    private void renderCustomers(
+            EditText search,
+            String mode
+    ) {
 
-        if (content == null) return;
-
-        ListView list = findCustomerList();
-
-        if (list == null) return;
-
-        renderCustomers(
-                list,
-                getFilteredCustomers(
-                        query,
-                        mode
-                )
-        );
-    }
-
-    private ListView findCustomerList() {
-
-        if (contentHost == null) return null;
-
-        return findListView(contentHost);
-    }
-
-    private ListView findListView(ViewGroup parent) {
-
-        for (int i = 0; i < parent.getChildCount(); i++) {
-
-            View child = parent.getChildAt(i);
-
-            if (child instanceof ListView) {
-                return (ListView) child;
-            }
-
-            if (child instanceof ViewGroup) {
-
-                ListView result =
-                        findListView((ViewGroup) child);
-
-                if (result != null) {
-                    return result;
-                }
-            }
+        if (content == null) {
+            return;
         }
 
-        return null;
+        String q =
+                search.getText()
+                        .toString();
+
+        // Rebuild customer screen with current filter
+        showCustomersFiltered(q, mode);
     }
 
-    private List<Customer> getFilteredCustomers(
+    private void showCustomersFiltered(
             String query,
-            String mode) {
+            String mode
+    ) {
 
-        ArrayList<Customer> result =
-                new ArrayList<>();
+        // Prevent recursive rebuild from search
+        base("Customers", true, true);
 
-        String q =
-                query == null
-                        ? ""
-                        : query.trim().toLowerCase(Locale.US);
+        LinearLayout searchRow =
+                new LinearLayout(this);
 
-        for (Customer c : customers) {
+        searchRow.setOrientation(
+                LinearLayout.HORIZONTAL
+        );
 
-            String hay =
-                    (c.boxId + " " +
-                            c.name + " " +
-                            c.phone + " " +
-                            c.address + " " +
-                            c.zone + " " +
-                     
+        EditText search =
+                field("Search name, mobile, box...");
+
+        search.setText(query);
+        search.setSelection(
+                search.length()
+        );
+
+        searchRow.addView(
+                search,
+                new LinearLayout.LayoutParams(
+                        0,
+                        dp(50),
+                        1
+                )
+        );
+
+        Button filterButton =
+                smallButton("☷");
+
+        LinearLayout.LayoutParams fp =
+                new LinearLayout.LayoutParams(
+                        dp(54),
+                        dp(50)
+                );
+
+        fp.setMargins(dp(6), 0, 0, 0);
+
+        searchRow.addView(filterButton, fp);
+
+        content.addView(searchRow);
+
+        LinearLayout chips =
+                new LinearLayout(this);
+
+        chips.setOrientation(
+                LinearLayout.HORIZONTAL
+        );
+
+        String[] chipNames = {
+                "All",
+                "Due",
+                "Advance",
+             
