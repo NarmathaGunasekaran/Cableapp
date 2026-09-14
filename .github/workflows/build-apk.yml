@@ -8,6 +8,7 @@ on:
 
 jobs:
   build:
+    name: Build Debug APK
     runs-on: ubuntu-latest
 
     steps:
@@ -19,74 +20,138 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+          cache: gradle
 
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v4
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages
+        run: |
+          yes | sdkmanager --licenses || true
+          sdkmanager "platform-tools" \
+                     "platforms;android-35" \
+                     "build-tools;35.0.0"
 
       - name: Find Android project
         shell: bash
         run: |
-          echo "Searching for Android project..."
+          echo "Searching for Gradle Android project..."
 
-          PROJECT_DIR=$(find . -type f \( \
-            -name "settings.gradle" -o \
-            -name "settings.gradle.kts" \
-          \) -print -quit | xargs -r dirname)
+          PROJECT_DIR=""
+
+          if [ -f "./settings.gradle" ] || [ -f "./settings.gradle.kts" ]; then
+            PROJECT_DIR="."
+          else
+            PROJECT_DIR=$(find . -maxdepth 4 \
+              \( -name settings.gradle -o -name settings.gradle.kts \) \
+              -print -quit | xargs -r dirname)
+          fi
 
           if [ -z "$PROJECT_DIR" ]; then
-            echo "ERROR: settings.gradle was not found."
-            echo "Repository contents:"
-            find . -maxdepth 3 -type f | sort
+            echo "ERROR: No settings.gradle or settings.gradle.kts found."
+            echo "Project files:"
+            find . -maxdepth 4 -type f | head -200
             exit 1
           fi
+
+          PROJECT_DIR=$(cd "$PROJECT_DIR" && pwd)
 
           echo "Android project found at:"
           echo "$PROJECT_DIR"
 
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
-      - name: Check Android project
-        shell: bash
+      - name: Check project files
         run: |
-          echo "Project directory: $PROJECT_DIR"
-          echo ""
-          echo "Project files:"
-          ls -la "$PROJECT_DIR"
-          echo ""
-          echo "App folder:"
-          ls -la "$PROJECT_DIR/app"
+          cd "$PROJECT_DIR"
 
-      - name: Check Gradle
-        shell: bash
+          echo "===== PROJECT ROOT ====="
+          pwd
+
+          echo "===== FILES ====="
+          ls -la
+
+          echo "===== GRADLE FILES ====="
+          find . -maxdepth 3 \
+            \( -name "build.gradle" -o -name "build.gradle.kts" \
+            -o -name "settings.gradle" -o -name "settings.gradle.kts" \
+            -o -name "gradlew" \) \
+            -print
+
+      - name: Make Gradle executable
         run: |
-          echo "Gradle location:"
-          which gradle
+          cd "$PROJECT_DIR"
 
-          echo "Gradle version:"
-          gradle --version
+          if [ -f "./gradlew" ]; then
+            chmod +x ./gradlew
+          else
+            echo "ERROR: gradlew not found."
+            exit 1
+          fi
 
-      - name: Build Debug APK
+      - name: Set minimum SDK to 26
         shell: bash
         run: |
           cd "$PROJECT_DIR"
 
-          echo "Starting Android build..."
+          echo "Updating Android minSdk to 26..."
 
-          gradle clean assembleDebug --no-daemon --stacktrace
+          find . -type f \
+            \( -name "build.gradle" -o -name "build.gradle.kts" \) \
+            -print0 | while IFS= read -r -d '' file
+          do
+            echo "Checking $file"
+
+            sed -i -E \
+              's/minSdk(Version)?[[:space:]]*[=:][[:space:]]*[0-9]+/minSdk\1 = 26/g' \
+              "$file" || true
+
+            sed -i -E \
+              's/minSdk[[:space:]]+[0-9]+/minSdk 26/g' \
+              "$file" || true
+          done
+
+          echo "===== minSdk references ====="
+          grep -Rni "minSdk" . \
+            --include="build.gradle" \
+            --include="build.gradle.kts" || true
+
+      - name: Clean project
+        run: |
+          cd "$PROJECT_DIR"
+          ./gradlew clean --no-daemon
+
+      - name: Build Debug APK
+        run: |
+          cd "$PROJECT_DIR"
+          ./gradlew assembleDebug --no-daemon --stacktrace
 
       - name: Find generated APK
         shell: bash
         run: |
-          echo "Searching for APK..."
+          cd "$PROJECT_DIR"
 
-          find "$PROJECT_DIR" \
-            -type f \
-            -name "*.apk" \
-            -print
+          echo "===== GENERATED APK FILES ====="
+
+          find . -type f -name "*.apk" -print
+
+          APK=$(find . -type f \
+            -path "*/build/outputs/apk/debug/*.apk" \
+            -print -quit)
+
+          if [ -z "$APK" ]; then
+            echo "ERROR: APK was not generated."
+            exit 1
+          fi
+
+          echo "APK found:"
+          echo "$APK"
+
+          echo "APK_PATH=$PROJECT_DIR/$APK" >> "$GITHUB_ENV"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: MyCablePro-debug-apk
-          path: "**/app/build/outputs/apk/debug/app-debug.apk"
+          name: CableManager-Debug-APK
+          path: ${{ env.APK_PATH }}
           if-no-files-found: error
